@@ -578,8 +578,27 @@ const generateAIResponse = async (aiState, message, chatHistory, strategy) => {
   logAPI.request('openai', context)
 
   try {
+    // Get analysis from server
+    const analysis = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message,
+        chatHistory,
+        character: aiState.name
+      })
+    }).then(res => res.json())
+
+    // Get AI response
     const data = await fetchAPIResponse(message, aiState, chatHistory)
-    const result = processAPIResponse(data, aiState)
+    
+    // Combine analysis with response
+    const result = {
+      message: data.message,
+      metrics: analysis.metrics || SAFE_DEFAULTS.metrics
+    }
     
     logAPI.response(200, result)
     return result

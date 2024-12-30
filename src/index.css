@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Add custom scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #4B5563;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}
+
+/* Add custom textarea scrollbar */
+textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: #4B5563;
+  border-radius: 3px;
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}
+
+/* Remove textarea resize handle */
+textarea::-webkit-resizer {
+  display: none;
+}
+
+/* Hide scrollbar on mobile strategy menu */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Adjust font sizes for mobile */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Smooth scrolling for chat container */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar when not hovering */
+.hover-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hover-scrollbar::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+/* Show scrollbar on hover */
+.hover-scrollbar:hover {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+
+.hover-scrollbar:hover::-webkit-scrollbar {
+  width: 6px;
+}
+
+/* Prevent scroll chaining */
+.overscroll-none {
+  overscroll-behavior: contain;
+}

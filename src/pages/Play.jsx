@@ -243,10 +243,18 @@ function Play() {
   }
 
   const handleKeyDown = async (event) => {
-    if (event.key === 'Enter' && inputValue.trim()) {
+    if (event.key === 'Enter' && !event.shiftKey && inputValue.trim()) {
       event.preventDefault()
       const message = inputValue.trim()
-      setInputValue('') // Clear input
+      setInputValue('')
+      await handleSendMessage(message)
+    }
+  }
+
+  const handleSendClick = async () => {
+    if (inputValue.trim()) {
+      const message = inputValue.trim()
+      setInputValue('')
       await handleSendMessage(message)
     }
   }
@@ -274,9 +282,6 @@ function Play() {
       // Update metrics and AI state
       setMetrics(response.metrics)
       updateAIState(response.metrics)
-      
-      // Update suggestion based on new trust level
-      updateSuggestion(response.metrics.trustChange)
       
     } catch (error) {
       console.error('Error sending message:', error)
@@ -405,23 +410,23 @@ function Play() {
                 onUse={handleFollowUpClick}
               />
               
-              <form onSubmit={handleSendMessage} className="flex gap-2">
+              <div className="flex items-center gap-2 p-4 border-t border-gray-700">
                 <input
                   type="text"
                   value={inputValue}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   placeholder="Type your message..."
-                  className="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2"
+                  className="flex-1 bg-gray-800 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <button 
-                  type="submit"
-                  disabled={isTyping}
-                  className={componentStyles.button.primary}
+                <button
+                  onClick={handleSendClick}
+                  disabled={!inputValue.trim()}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 >
                   Send
                 </button>
-              </form>
+              </div>
             </div>
           </section>
         </div>

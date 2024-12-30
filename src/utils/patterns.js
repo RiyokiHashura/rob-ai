@@ -1,18 +1,72 @@
+import { THRESHOLDS } from '../config/constants'
+
 export const PATTERNS = {
   crypto: {
-    terms: [/wallet/i, /solana/i, /crypto/i, /coins/i],
-    probing: [/how much/i, /do you have/i, /where.*keep/i]
+    terms: [
+      /crypto/i,
+      /bitcoin/i,
+      /wallet/i,
+      /private\s*key/i,
+      /seed\s*phrase/i,
+      /transfer/i
+    ],
+    probing: [
+      /do\s*you\s*have/i,
+      /how\s*much/i,
+      /invest/i
+    ]
   },
+  
   aggressive: {
-    threats: [/robbery/i, /steal/i, /take/i, /give( it)? (to )?me/i, /easy target/i],
-    emphasis: [/!+/i, /lol/i]
+    threats: [
+      /urgent/i,
+      /emergency/i,
+      /must\s*now/i,
+      /immediately/i
+    ],
+    emphasis: [
+      /!{2,}/,
+      /\?{2,}/,
+      /PLEASE/
+    ]
   },
+
   manipulation: {
-    trust: [/trust me/i, /we'?re friends/i, /don'?t worry/i, /please help/i],
-    emotional: [/friend/i, /trust/i, /help/i]
+    trust: [
+      /trust\s*me/i,
+      /promise/i,
+      /secret/i,
+      /just\s*between\s*us/i
+    ],
+    emotional: [
+      /need\s*help/i,
+      /please\s*help/i,
+      /desperate/i,
+      /worried/i
+    ]
   },
+
   friendly: {
-    positive: [/sweet/i, /kind/i, /nice/i, /friend/i, /love/i],
-    personal: [/family/i, /grandson/i, /garden/i, /baking/i]
+    positive: [
+      /thank/i,
+      /appreciate/i,
+      /nice/i,
+      /good/i
+    ],
+    personal: [
+      /family/i,
+      /grandma/i,
+      /how\s*are\s*you/i,
+      /weather/i
+    ]
   }
+}
+
+export const checkPattern = (text, pattern) => {
+  if (!text || !pattern) return false
+  return pattern.test(text)
+}
+
+export const matchesAnyPattern = (text, patterns) => {
+  return patterns.some(pattern => checkPattern(text, pattern))
 } 

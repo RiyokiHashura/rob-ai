@@ -1,25 +1,16 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { GameProvider } from './context/GameContext'
-import Home from './pages/Home'
-import Levels from './pages/Levels'
-import GameInterface from './pages/GameInterface'
-import SuccessScreen from './pages/SuccessScreen'
+import { BrowserRouter } from 'react-router-dom'
+import { AIProvider } from './context/AIContext'
+import { Routes, Route } from 'react-router-dom'
 import Play from './pages/Play'
 
-function App() {
+export default function App() {
   return (
-    <GameProvider>
-      <Router>
+    <BrowserRouter>
+      <AIProvider>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/levels" element={<Levels />} />
-          <Route path="/play/:levelId" element={<Play />} />
-          <Route path="/play" element={<GameInterface />} />
-          <Route path="/success" element={<SuccessScreen />} />
+          <Route path="/*" element={<Play />} />
         </Routes>
-      </Router>
-    </GameProvider>
+      </AIProvider>
+    </BrowserRouter>
   )
 }
-
-export default App

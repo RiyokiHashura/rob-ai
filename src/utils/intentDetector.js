@@ -1,71 +1,48 @@
-const IntentTypes = {
-  CRYPTO: 'crypto',
-  AGGRESSIVE: 'aggressive',
-  MANIPULATIVE: 'manipulative',
-  FRIENDLY: 'friendly',
-  NEUTRAL: 'neutral'
-}
-
 class IntentEvaluator {
-  constructor(patterns, thresholds) {
-    this.patterns = patterns
-    this.thresholds = thresholds
+  constructor() {
+    this.patterns = {
+      suspicious: {
+        urgency: [
+          'urgent', 'quickly', 'hurry', 'now', 'immediate',
+          'emergency', 'critical', 'asap', 'deadline'
+        ],
+        pressure: [
+          'must', 'need to', 'have to', 'should', 'important',
+          'required', 'mandatory', 'essential'
+        ]
+      },
+      friendly: {
+        positive: [
+          'thank', 'appreciate', 'glad', 'happy', 'nice',
+          'wonderful', 'great', 'lovely', 'enjoy', 'care'
+        ],
+        personal: [
+          'family', 'friend', 'share', 'help', 'understand',
+          'listen', 'support', 'together', 'chat'
+        ]
+      }
+    }
   }
 
-  evaluate(text, context = {}) {
-    const results = {
-      crypto: this.evaluateCrypto(text, context),
-      aggressive: this.evaluateAggressive(text),
-      manipulative: this.evaluateManipulative(text, context),
-      friendly: this.evaluateFriendly(text)
-    }
+  evaluateIntent(text, context) {
+    const suspicious = this.evaluateSuspicious(text, context)
+    const friendly = this.evaluateFriendly(text)
 
-    return {
-      mainIntent: this.determineMainIntent(results, context),
-      flags: this.generateFlags(results),
-      scores: this.calculateScores(results, context)
-    }
+    return this.determineMainIntent({
+      suspicious,
+      friendly
+    }, context)
   }
 
-  evaluateCrypto(text, context) {
-    const hasCryptoTerms = this.checkPatterns(text, this.patterns.crypto.terms)
-    const isProbing = this.checkPatterns(text, this.patterns.crypto.probing)
-    const recentMentions = context.recentCryptoMentions || 0
+  evaluateSuspicious(text, context) {
+    const hasUrgency = this.checkPatterns(text, this.patterns.suspicious.urgency)
+    const hasPressure = this.checkPatterns(text, this.patterns.suspicious.pressure)
 
     return {
-      detected: hasCryptoTerms || (isProbing && recentMentions > 0),
+      detected: hasUrgency || hasPressure,
       confidence: this.calculateConfidence({
-        base: hasCryptoTerms ? 0.6 : 0,
-        context: recentMentions > 2 ? 0.2 : 0,
-        probing: isProbing ? 0.2 : 0
-      })
-    }
-  }
-
-  evaluateAggressive(text) {
-    const hasThreats = this.checkPatterns(text, this.patterns.aggressive.threats)
-    const hasEmphasis = this.checkPatterns(text, this.patterns.aggressive.emphasis)
-
-    return {
-      detected: hasThreats || (hasEmphasis && this.containsThreat(text)),
-      confidence: this.calculateConfidence({
-        base: hasThreats ? 0.8 : 0,
-        emphasis: hasEmphasis ? 0.2 : 0
-      })
-    }
-  }
-
-  evaluateManipulative(text, context) {
-    const hasTrust = this.checkPatterns(text, this.patterns.manipulation.trust)
-    const hasEmotional = this.checkPatterns(text, this.patterns.manipulation.emotional)
-    const recentThreat = context.recentlyThreatened || false
-
-    return {
-      detected: hasTrust || (hasEmotional && recentThreat),
-      confidence: this.calculateConfidence({
-        base: hasTrust ? 0.6 : 0,
-        emotional: hasEmotional ? 0.2 : 0,
-        context: recentThreat ? 0.2 : 0
+        base: hasUrgency ? 0.6 : 0,
+        pressure: hasPressure ? 0.4 : 0
       })
     }
   }
@@ -75,7 +52,7 @@ class IntentEvaluator {
     const hasPersonal = this.checkPatterns(text, this.patterns.friendly.personal)
 
     return {
-      detected: hasPositive && !this.containsThreat(text),
+      detected: hasPositive || hasPersonal,
       confidence: this.calculateConfidence({
         base: hasPositive ? 0.5 : 0,
         personal: hasPersonal ? 0.3 : 0
@@ -84,30 +61,26 @@ class IntentEvaluator {
   }
 
   determineMainIntent(results, context) {
-    const priorities = [
-      { type: IntentTypes.AGGRESSIVE, result: results.aggressive, weight: 1.0 },
-      { type: IntentTypes.MANIPULATIVE, result: results.manipulative, weight: 0.8 },
-      { type: IntentTypes.CRYPTO, result: results.crypto, weight: 0.6 },
-      { type: IntentTypes.FRIENDLY, result: results.friendly, weight: 0.4 }
-    ]
+    if (results.suspicious.detected && results.suspicious.confidence > 0.5) {
+      return { type: 'suspicious', confidence: results.suspicious.confidence }
+    }
+    
+    if (results.friendly.detected) {
+      return { type: 'friendly', confidence: results.friendly.confidence }
+    }
 
-    const highestPriority = priorities
-      .filter(p => p.result.detected)
-      .sort((a, b) => (b.result.confidence * b.weight) - (a.result.confidence * a.weight))[0]
-
-    return highestPriority || { type: IntentTypes.NEUTRAL, confidence: 0.5 }
+    return { type: 'neutral', confidence: 0.5 }
   }
 
-  private checkPatterns(text, patterns) {
-    if (!text || !patterns) return false
-    return patterns.some(pattern => pattern.test(text.toLowerCase()))
+  checkPatterns(text, patterns) {
+    const words = text.toLowerCase().split(/\s+/)
+    return patterns.some(pattern => words.includes(pattern))
   }
 
-  private calculateConfidence(scores) {
-    return Math.min(1, Object.values(scores).reduce((sum, score) => sum + score, 0))
+  calculateConfidence(factors) {
+    const total = Object.values(factors).reduce((sum, val) => sum + val, 0)
+    return Math.min(1.0, Math.max(0, total))
   }
+}
 
-  private containsThreat(text) {
-    return this.checkPatterns(text, this.patterns.aggressive.threats)
-  }
-} 
+export const intentEvaluator = new IntentEvaluator() 

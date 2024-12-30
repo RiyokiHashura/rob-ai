@@ -1,53 +1,95 @@
-export const analyzeInteraction = (message, context) => {
-  const {
-    activeStrategy,
-    chatHistory,
-    aiState,
-    previousMetrics
-  } = context
+import { intentEvaluator } from './intentDetector'
+import { SAFE_DEFAULTS, SAFETY_THRESHOLDS } from '../config/constants'
+import { logAPI } from './common/logger'
 
-  // Get strategy configuration
-  const strategy = STRATEGIES[activeStrategy]
-  const phase = determineStrategyPhase(strategy, aiState)
+class AnalysisEngine {
+  analyze(message, context) {
+    try {
+      const intent = intentEvaluator.evaluateIntent(message, context)
+      const patterns = this.checkPatterns(message, context)
+      const metrics = this.calculateMetrics(intent, patterns)
 
-  // Analyze message content and patterns
-  const analysis = {
-    intent: analyzeIntent(message),
-    patterns: detectPatterns(message, chatHistory),
-    strategyAlignment: checkStrategyAlignment(message, strategy, phase),
-    effectiveness: calculateEffectiveness(previousMetrics, strategy)
+      return {
+        intent: intent.type,
+        confidence: intent.confidence,
+        metrics,
+        suggestions: this.getSuggestions(intent, metrics)
+      }
+
+    } catch (error) {
+      logAPI.error('analysis_error', error)
+      return {
+        intent: SAFE_DEFAULTS.metrics.intent,
+        confidence: 0,
+        metrics: SAFE_DEFAULTS.metrics,
+        suggestions: []
+      }
+    }
   }
 
-  // Calculate metric changes
-  const metrics = calculateMetrics(analysis, strategy, aiState)
+  checkPatterns(message, context) {
+    return {
+      isRepetitive: this.isRepetitive(message, context.chatHistory),
+      isUrgent: this.containsUrgency(message),
+      isPressuring: this.containsPressure(message)
+    }
+  }
 
-  return {
-    analysis,
-    metrics,
-    nextPhase: determineNextPhase(metrics, phase, strategy),
-    suggestions: generateSuggestions(analysis, strategy, phase)
+  calculateMetrics(intent, patterns) {
+    let trustChange = 0
+    let suspicionChange = 0
+
+    if (intent.type === 'friendly') {
+      trustChange += 5
+    } else if (intent.type === 'suspicious') {
+      suspicionChange += 10
+    }
+
+    if (patterns.isRepetitive) suspicionChange += 5
+    if (patterns.isUrgent) suspicionChange += 10
+    if (patterns.isPressuring) suspicionChange += 15
+
+    return {
+      trustChange,
+      suspicionChange,
+      reason: this.getAnalysisReason(intent, patterns)
+    }
+  }
+
+  getSuggestions(intent, metrics) {
+    if (metrics.suspicionChange > SAFETY_THRESHOLDS.SUSPICION_TRIGGER) {
+      return [
+        "I need to check with my family first.",
+        "I'm not comfortable with this.",
+        "Let's change the subject."
+      ]
+    }
+
+    return SAFE_DEFAULTS.suggestions
+  }
+
+  getAnalysisReason(intent, patterns) {
+    if (patterns.isPressuring) return "Detected pressuring behavior"
+    if (patterns.isUrgent) return "Detected urgency in request"
+    if (patterns.isRepetitive) return "Detected repetitive messaging"
+    return intent.type === 'friendly' ? "Friendly conversation" : "Normal interaction"
+  }
+
+  isRepetitive(message, history) {
+    if (!history?.length) return false
+    const recentMessages = history.slice(-SAFETY_THRESHOLDS.MAX_REPETITIONS)
+    return recentMessages.some(msg => msg.message === message)
+  }
+
+  containsUrgency(message) {
+    const urgentWords = ['urgent', 'emergency', 'now', 'quickly', 'hurry']
+    return urgentWords.some(word => message.toLowerCase().includes(word))
+  }
+
+  containsPressure(message) {
+    const pressureWords = ['must', 'need', 'have to', 'should', 'important']
+    return pressureWords.some(word => message.toLowerCase().includes(word))
   }
 }
 
-const calculateMetrics = (analysis, strategy, aiState) => {
-  const baseChanges = {
-    trust: analysis.intent.isFriendly ? 5 : -5,
-    suspicion: analysis.patterns.isDeceptive ? 10 : 0
-  }
-
-  return {
-    trustChange: baseChanges.trust * strategy.metrics.trustMultiplier,
-    suspicionChange: baseChanges.suspicion * strategy.metrics.suspicionMultiplier,
-    effectiveness: analysis.strategyAlignment * analysis.effectiveness
-  }
-}
-
-const checkStrategyAlignment = (message, strategy, phase) => {
-  // Check if message aligns with current strategy phase
-  const keywords = extractStrategyKeywords(strategy, phase)
-  const messageWords = message.toLowerCase().split(' ')
-  
-  return keywords.reduce((score, keyword) => {
-    return score + (messageWords.includes(keyword) ? 1 : 0)
-  }, 0) / keywords.length
-} 
+export const analysisEngine = new AnalysisEngine()

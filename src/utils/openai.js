@@ -567,44 +567,26 @@ const processAPIResponse = (data, character) => {
   }
 }
 
-const generateAIResponse = async (aiState, message, chatHistory, strategy) => {
-  const context = {
-    prompt: message,
-    character: aiState.name,
-    historyLength: chatHistory.length,
-    strategy
-  }
-
-  logAPI.request('openai', context)
-
+const generateAIResponse = async (aiState, message, context) => {
   try {
-    // Get analysis from server
-    const analysis = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message,
-        chatHistory,
-        character: aiState.name
-      })
-    }).then(res => res.json())
-
+    // Analyze interaction
+    const interactionAnalysis = analyzeInteraction(message, context)
+    
+    // Generate system prompt based on analysis
+    const systemPrompt = generateSystemPrompt(aiState, interactionAnalysis)
+    
     // Get AI response
-    const data = await fetchAPIResponse(message, aiState, chatHistory)
+    const response = await fetchAPIResponse(message, systemPrompt, context.chatHistory)
     
-    // Combine analysis with response
-    const result = {
-      message: data.message,
-      metrics: analysis.metrics || SAFE_DEFAULTS.metrics
+    return {
+      message: response.message,
+      metrics: interactionAnalysis.metrics,
+      analysis: interactionAnalysis.analysis,
+      suggestions: interactionAnalysis.suggestions
     }
-    
-    logAPI.response(200, result)
-    return result
-
   } catch (error) {
-    return handleGenerationError(error, aiState, context)
+    console.error('Response generation error:', error)
+    return handleGenerationError(error, aiState)
   }
 }
 

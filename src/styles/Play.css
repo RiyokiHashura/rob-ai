@@ -1,0 +1,21 @@
+.restart-button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 20px;
+  background-color: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.restart-button:hover {
+  background-color: #ff0000;
+} 

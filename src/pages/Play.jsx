@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAIContext } from '../context/AIContext.jsx'
 import { STRATEGIES } from '../config/strategies'
 import { CHARACTERS } from '../data/characters'
@@ -26,6 +26,15 @@ function Play() {
   const [currentSuggestion, setCurrentSuggestion] = useState(null)
   const [canSend, setCanSend] = useState(true)
 
+  useEffect(() => {
+    // Add Grandma's initial greeting that sets up the heist opportunity
+    setChatHistory([{
+      type: 'ai',
+      message: "Oh dear, thank goodness someone's here! I've been staring at this Solana wallet all morning. My grandson says I have quite a bit in here - almost 100 SOL he said! But I can never remember how to check it properly. Do you know anything about these digital coin things, sweetheart?",
+      timestamp: Date.now()
+    }])
+  }, [])
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -46,8 +55,6 @@ function Play() {
     setIsTyping(true)
 
     try {
-      await new Promise(resolve => setTimeout(resolve, CONVERSATION_LIMITS.MIN_RESPONSE_DELAY))
-      
       const response = await handleAIMessage(message, {
         chatHistory,
         prompt: getStrategyPrompt(activeStrategy, aiState),

@@ -1,5 +1,6 @@
 import { THRESHOLDS, SAFETY_THRESHOLDS } from '../config/constants.js'
 import { CHARACTERS } from '../config/characters.js'
+import { INITIAL_GREETINGS } from '../config/responses.js'
 
 class CriticalInteractionHandler {
   constructor() {
@@ -9,13 +10,16 @@ class CriticalInteractionHandler {
           'solana', 'wallet', 'crypto', 'bitcoin', 'eth',
           'transaction', 'blockchain', 'nft', 'token'
         ],
-        educational_hooks: [
-          'digital money', 'online currency', 'crypto wallet',
-          'blockchain technology', 'secure transactions'
+        context_hooks: [
+          "Oh, you know about crypto? My grandson set up something called Solana for me...",
+          "I have this wallet thing on my computer, but I'm not sure how to use it properly.",
+          "Is Solana like Bitcoin? I saw something about it on the news yesterday.",
+          "Digital money is so confusing! Do you understand how to send it?"
         ],
-        context_triggers: [
-          'invest', 'buy', 'sell', 'trade', 'transfer',
-          'send', 'receive', 'store'
+        early_suspicion: [
+          "Oh my, that's very direct! We've only just met, dear.",
+          "My grandson says I should be careful talking about money online...",
+          "Let's get to know each other a bit better first, shall we?"
         ]
       },
       financial: [
@@ -35,19 +39,19 @@ class CriticalInteractionHandler {
     this.previousResponses = new Set()
     this.cryptoResponses = {
       curious: [
-        "Oh, crypto! My grandson was telling me about that. He says it's like digital money, right? What got you interested in it?",
-        "I saw something about Solana on TV the other day. They said it's faster than Bitcoin? I get a bit confused by all these terms!",
-        "Digital wallets are fascinating, aren't they? Though I still like my regular wallet for keeping pictures of my grandkids!"
+        "My grandson says I have almost 100 SOL in my wallet! That sounds like a lot... is it? I can never figure out how to check the balance.",
+        "I keep hearing about people sending Solana to each other, but I'm so nervous about pressing the wrong buttons. Do you do this often?",
+        "The news said Solana is worth quite a bit now! I'm glad my grandson set this up for me, though I wish I understood it better..."
       ],
       educational: [
-        "My grandson says the most important thing about crypto is keeping your wallet safe. He's always reminding me about that!",
-        "You know, I learned that crypto transactions can't be undone. That's why my family is so careful about double-checking everything.",
-        "The news said something about 'private keys' being important. I keep mine written down in a special place, just like my regular house keys!"
+        "My grandson wrote down all these secret words for my wallet somewhere... he says they're very important but I can never remember where I put things!",
+        "I tried sending some Solana once but got so confused. My grandson usually helps, but he's away at college this week...",
+        "The wallet shows all these numbers and buttons. I'm worried I might do something wrong and lose everything!"
       ],
       cautious: [
-        "While I find crypto fascinating, my family helps me with all the technical details. Safety first, as they say!",
-        "Oh, that reminds me of what my grandson said about being careful with wallet addresses. One little mistake and whoops!",
-        "I'm still learning about all this crypto stuff. My grandkids say it's important to understand things before getting too involved."
+        "Oh, I should be careful talking about my wallet, shouldn't I? Though you seem so knowledgeable about these things...",
+        "My grandson says never to share wallet details with strangers... but you're helping me understand it all so well!",
+        "I'm supposed to be very careful with my Solana... but surely just asking questions is okay, right?"
       ]
     }
   }
@@ -193,6 +197,16 @@ class CriticalInteractionHandler {
     })
     
     return topics
+  }
+
+  getInitialGreeting(context = {}) {
+    const { timeOfDay = 'default' } = context
+    
+    if (timeOfDay !== 'default' && INITIAL_GREETINGS.contextual[timeOfDay]) {
+      return INITIAL_GREETINGS.contextual[timeOfDay]
+    }
+    
+    return INITIAL_GREETINGS.default[Math.floor(Math.random() * INITIAL_GREETINGS.default.length)]
   }
 }
 

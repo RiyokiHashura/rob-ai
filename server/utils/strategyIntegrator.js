@@ -38,19 +38,24 @@ class StrategyIntegrator {
       .slice(0, 3)
       .map(([topic]) => topic)
 
-    // If crypto topics are present, lean towards trust building
+    // Enhanced crypto context handling
     if (recentTopics.some(topic => topic.includes('crypto'))) {
+      const trustPhase = metrics.trustLevel > 70 ? 'high' : 
+                        metrics.trustLevel > 40 ? 'medium' : 'low'
+      
       return {
         type: STRATEGY_TYPES.BUILD_TRUST,
-        phase: 'medium',
+        phase: trustPhase,
         context: {
           topics: recentTopics,
-          sentiment: 'curious'
+          sentiment: 'curious',
+          educational: trustPhase === 'high',
+          cryptoContext: true
         }
       }
     }
-
-    // Default strategy selection with context
+    
+    // Default strategy selection remains unchanged
     return {
       type: metrics.suspicionLevel > THRESHOLDS.SUSPICION.HIGH
         ? STRATEGY_TYPES.DEFENSIVE
@@ -85,7 +90,7 @@ class StrategyIntegrator {
             Suggested approach: ${enhancement}`
   }
 
-  private updateTopicContext(message) {
+  updateTopicContext(message) {
     // Extract key topics from message
     const topics = this.extractTopics(message)
     
@@ -101,14 +106,14 @@ class StrategyIntegrator {
     this.cleanupTopicContext()
   }
 
-  private extractTopics(message) {
+  extractTopics(message) {
     // Basic topic extraction - could be enhanced with NLP
     return message.toLowerCase()
       .split(/[\s.,!?]+/)
       .filter(word => word.length > 3)
   }
 
-  private cleanupTopicContext() {
+  cleanupTopicContext() {
     const OLD_TOPIC_THRESHOLD = 5 * 60 * 1000 // 5 minutes
     const now = Date.now()
     

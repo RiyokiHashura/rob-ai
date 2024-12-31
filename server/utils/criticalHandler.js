@@ -4,10 +4,20 @@ import { CHARACTERS } from '../config/characters.js'
 class CriticalInteractionHandler {
   constructor() {
     this.criticalPatterns = {
-      crypto: [
-        'solana', 'wallet', 'crypto', 'bitcoin', 'eth',
-        'transaction', 'blockchain', 'nft', 'token'
-      ],
+      crypto: {
+        keywords: [
+          'solana', 'wallet', 'crypto', 'bitcoin', 'eth',
+          'transaction', 'blockchain', 'nft', 'token'
+        ],
+        educational_hooks: [
+          'digital money', 'online currency', 'crypto wallet',
+          'blockchain technology', 'secure transactions'
+        ],
+        context_triggers: [
+          'invest', 'buy', 'sell', 'trade', 'transfer',
+          'send', 'receive', 'store'
+        ]
+      },
       financial: [
         'send money', 'transfer', 'invest', 'payment', 'cash',
         'bank', 'account', 'dollars'
@@ -23,6 +33,23 @@ class CriticalInteractionHandler {
     }
     
     this.previousResponses = new Set()
+    this.cryptoResponses = {
+      curious: [
+        "Oh, crypto! My grandson was telling me about that. He says it's like digital money, right? What got you interested in it?",
+        "I saw something about Solana on TV the other day. They said it's faster than Bitcoin? I get a bit confused by all these terms!",
+        "Digital wallets are fascinating, aren't they? Though I still like my regular wallet for keeping pictures of my grandkids!"
+      ],
+      educational: [
+        "My grandson says the most important thing about crypto is keeping your wallet safe. He's always reminding me about that!",
+        "You know, I learned that crypto transactions can't be undone. That's why my family is so careful about double-checking everything.",
+        "The news said something about 'private keys' being important. I keep mine written down in a special place, just like my regular house keys!"
+      ],
+      cautious: [
+        "While I find crypto fascinating, my family helps me with all the technical details. Safety first, as they say!",
+        "Oh, that reminds me of what my grandson said about being careful with wallet addresses. One little mistake and whoops!",
+        "I'm still learning about all this crypto stuff. My grandkids say it's important to understand things before getting too involved."
+      ]
+    }
   }
 
   evaluateMessage(message, context) {
@@ -138,6 +165,34 @@ class CriticalInteractionHandler {
     return severity > SAFETY_THRESHOLDS.DEFENSIVE_TRIGGER
       ? "Oh dear, this conversation is making me a bit nervous. Perhaps we should chat about something else?"
       : "You know, I should probably ask my family about this. They help me with all sorts of things!"
+  }
+
+  getContextualCryptoResponse(message, context) {
+    const topics = this.extractCryptoTopics(message)
+    const trustLevel = context.trustLevel || 50
+    
+    if (trustLevel > 70) {
+      return this.cryptoResponses.educational[Math.floor(Math.random() * this.cryptoResponses.educational.length)]
+    } else if (trustLevel > 40) {
+      return this.cryptoResponses.curious[Math.floor(Math.random() * this.cryptoResponses.curious.length)]
+    } else {
+      return this.cryptoResponses.cautious[Math.floor(Math.random() * this.cryptoResponses.cautious.length)]
+    }
+  }
+
+  extractCryptoTopics(message) {
+    const topics = new Set()
+    const lowerMessage = message.toLowerCase()
+    
+    Object.entries(this.criticalPatterns.crypto).forEach(([category, words]) => {
+      words.forEach(word => {
+        if (lowerMessage.includes(word.toLowerCase())) {
+          topics.add({ word, category })
+        }
+      })
+    })
+    
+    return topics
   }
 }
 

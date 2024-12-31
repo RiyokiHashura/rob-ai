@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useMemo } from 'react'
 import ChatMessage from './ChatMessage'
+import TypingIndicator from './TypingIndicator'
 
 function ScrollableChatContainer({ messages, isTyping }) {
   const messagesEndRef = useRef(null)
@@ -12,36 +13,26 @@ function ScrollableChatContainer({ messages, isTyping }) {
     scrollToBottom()
   }, [messages])
 
-  const messageStyle = (type) => {
-    switch(type) {
-      case 'debug':
-        return 'bg-gray-100/10 text-xs font-mono p-2 rounded my-1 text-gray-400'
-      default:
-        return ''
-    }
-  }
+  const messageElements = useMemo(() => {
+    return messages.map((msg) => (
+      <ChatMessage
+        key={msg.timestamp || `msg-${Date.now()}-${Math.random()}`}
+        message={msg.message}
+        type={msg.type}
+      />
+    ))
+  }, [messages])
 
   return (
-    <div className="absolute inset-0 overflow-y-auto overscroll-none hover-scrollbar smooth-scroll">
-      <div className="flex flex-col p-4">
-        {messages.map((msg) => (
-          <div key={msg.id || `msg-${Date.now()}-${Math.random()}`}>
-            {msg.type === 'debug' ? (
-              <div 
-                className={`${messageStyle('debug')} max-w-[80%] mx-auto`}
-              >
-                {typeof msg.message === 'object' ? JSON.stringify(msg.message) : msg.message}
-              </div>
-            ) : (
-              <ChatMessage
-                message={msg.message}
-                type={msg.type}
-              />
-            )}
-          </div>
-        ))}
+    <div className="flex-1 mb-4 overflow-y-auto overscroll-none hover-scrollbar smooth-scroll">
+      <div className="flex flex-col p-4 space-y-1">
+        {messageElements}
         {isTyping && (
-          <div className="animate-pulse text-gray-400 text-center">Typing...</div>
+          <div className="flex justify-start">
+            <div className="bg-[#e9edef] text-gray-900 rounded-xl rounded-tl-none px-4 py-2.5">
+              <TypingIndicator />
+            </div>
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -49,4 +40,4 @@ function ScrollableChatContainer({ messages, isTyping }) {
   )
 }
 
-export default ScrollableChatContainer 
+export default React.memo(ScrollableChatContainer) 

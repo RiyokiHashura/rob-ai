@@ -8,10 +8,10 @@ const CharacterPanel = ({ character, trustLevel, suspicionLevel }) => {
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`${componentStyles.card} mb-4 p-4`}
+      className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl mb-4 p-4 shadow-lg relative"
     >
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-gray-700/50 overflow-hidden flex-shrink-0">
+        <div className="w-12 h-12 rounded-full bg-gray-700/50 overflow-hidden flex-shrink-0 ring-2 ring-gray-600/50">
           <img 
             src={`/${character.name.toLowerCase()}.webp`}
             alt={character.name}
@@ -33,16 +33,15 @@ const CharacterPanel = ({ character, trustLevel, suspicionLevel }) => {
             {character.basePrompt?.split('\n')[0].trim()}
           </p>
 
-          {/* Trust and Suspicion Meters */}
           <div className="mt-3 space-y-2">
             <div>
               <div className="flex justify-between text-xs text-gray-400 mb-1">
                 <span>Trust</span>
                 <span>{trustLevel}%</span>
               </div>
-              <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-700/50 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-green-500"
+                  className="h-full bg-green-500/80"
                   initial={{ width: 0 }}
                   animate={{ width: `${trustLevel}%` }}
                   transition={{ duration: 0.5 }}
@@ -55,9 +54,9 @@ const CharacterPanel = ({ character, trustLevel, suspicionLevel }) => {
                 <span>Suspicion</span>
                 <span>{suspicionLevel}%</span>
               </div>
-              <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-700/50 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-red-500"
+                  className="h-full bg-red-500/80"
                   initial={{ width: 0 }}
                   animate={{ width: `${suspicionLevel}%` }}
                   transition={{ duration: 0.5 }}
@@ -67,6 +66,9 @@ const CharacterPanel = ({ character, trustLevel, suspicionLevel }) => {
           </div>
         </div>
       </div>
+      
+      {/* Decorative bottom divider */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-gray-600/50 to-transparent" />
     </motion.div>
   )
 }

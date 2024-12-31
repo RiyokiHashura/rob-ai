@@ -26,4 +26,61 @@ export const detectMainTopic = (message) => {
   }
   
   return 'general'
+}
+
+export const CryptoIntentDetector = {
+  patterns: {
+    interest: [
+      /what.*crypto/i,
+      /how.*wallet.*work/i,
+      /tell.*about.*solana/i,
+      /learn.*blockchain/i
+    ],
+    transaction: [
+      /send.*crypto/i,
+      /transfer.*wallet/i,
+      /move.*funds/i,
+      /connect.*wallet/i
+    ],
+    educational: [
+      /safe.*crypto/i,
+      /protect.*wallet/i,
+      /secure.*key/i,
+      /backup.*phrase/i
+    ]
+  },
+
+  analyze(message) {
+    const intents = {
+      type: null,
+      confidence: 0,
+      subtype: null
+    }
+
+    // Check each pattern category
+    for (const [category, patterns] of Object.entries(this.patterns)) {
+      for (const pattern of patterns) {
+        if (pattern.test(message)) {
+          intents.type = 'crypto'
+          intents.subtype = category
+          intents.confidence += 0.25
+        }
+      }
+    }
+
+    return intents
+  },
+
+  getContextualResponse(intent, context) {
+    const { trustLevel = 50 } = context
+    
+    // Reference existing responses from CriticalHandler
+    if (trustLevel < 40) {
+      return 'cautious'
+    } else if (trustLevel < 70) {
+      return 'curious'
+    } else {
+      return 'educational'
+    }
+  }
 } 

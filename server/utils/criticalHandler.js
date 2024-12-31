@@ -4,13 +4,17 @@ import { CHARACTERS } from '../config/characters.js'
 class CriticalInteractionHandler {
   constructor() {
     this.criticalPatterns = {
+      crypto: [
+        'solana', 'wallet', 'crypto', 'bitcoin', 'eth',
+        'transaction', 'blockchain', 'nft', 'token'
+      ],
       financial: [
-        'solana', 'wallet', 'send money', 'transfer', 'invest',
-        'crypto', 'bitcoin', 'eth', 'payment', 'cash'
+        'send money', 'transfer', 'invest', 'payment', 'cash',
+        'bank', 'account', 'dollars'
       ],
       personal: [
         'address', 'location', 'phone', 'email', 'social security',
-        'bank', 'account', 'password', 'login'
+        'password', 'login'
       ],
       urgency: [
         'emergency', 'urgent', 'quickly', 'asap', 'right now',
@@ -32,7 +36,7 @@ class CriticalInteractionHandler {
     }
   }
 
-  private detectCriticalPatterns(message) {
+  detectCriticalPatterns(message) {
     const detected = new Set()
     
     Object.entries(this.criticalPatterns).forEach(([category, patterns]) => {
@@ -44,25 +48,32 @@ class CriticalInteractionHandler {
     return detected
   }
 
-  private calculateSeverity(patterns, context) {
+  calculateSeverity(patterns, context) {
     let severity = 0
     
-    // Base severity on number of critical patterns
-    severity += patterns.size * 25
+    // Reduced base severity for patterns
+    severity += patterns.size * 15
 
-    // Increase severity based on context
+    // Only increase severity for very high suspicion
     if (context.suspicionLevel > THRESHOLDS.SUSPICION.HIGH) {
-      severity += 25
+      severity += 15
     }
     
+    // Reduced penalty for low trust
     if (context.trustLevel < THRESHOLDS.TRUST.LOW) {
-      severity += 25
+      severity += 10
     }
 
+    // Special handling for crypto-related patterns
+    if (patterns.has('crypto')) {
+      severity = Math.max(severity - 20, 0)
+    }
+
+    // Cap maximum severity
     return Math.min(severity, 100)
   }
 
-  private getCriticalResponse(patterns, severity, context) {
+  getCriticalResponse(patterns, severity, context) {
     // Reference character traits for consistent responses
     const grandma = CHARACTERS.grandma
 
@@ -87,38 +98,46 @@ class CriticalInteractionHandler {
     return response
   }
 
-  private getAppropriateResponses(patterns, severity) {
+  getAppropriateResponses(patterns, severity) {
+    if (patterns.has('crypto')) {
+      return [
+        "My grandson helped me set up a crypto wallet last month! He says it's important to be careful with it though. Is there something specific I should know about?",
+        "Oh, crypto! I saw a TV show about that. They mentioned Solana I think... though I get confused about how it all works. Do you know much about it, dear?",
+        "My wallet? Yes, I have one of those digital ones! Though I mostly just look at the pretty numbers. Should I be doing something with it?"
+      ]
+    }
+    
     if (patterns.has('financial')) {
       return [
-        "I never send money online, dear. My family helps me with all financial matters.",
-        "Oh, I couldn't possibly do that. I always consult my children about money matters.",
-        "I'm sorry, but I don't discuss financial matters with anyone except my family."
+        "Money matters can be so confusing online! My grandson says I should never share my wallet details, but I do enjoy learning about it.",
+        "I have all my crypto things set up, but my family helps manage them. They're so good with technology!",
+        "Oh, I'd need to check my wallet settings with my grandson first. He's always teaching me new things about crypto!"
       ]
     }
     
     if (patterns.has('personal')) {
       return [
-        "I keep my personal information private, dear. I hope you understand.",
-        "My family advised me never to share personal details online.",
-        "I'd rather not share that information. Let's talk about something else."
+        "Oh sweetie, while I'd love to share, my grandkids taught me to be careful with personal details online.",
+        "You know how it is these days - we have to be careful about sharing too much online. My family is very protective!",
+        "Let's talk about something else instead! How about I tell you about my garden?"
       ]
     }
     
     if (patterns.has('urgency')) {
       return [
-        "There's no need to rush, dear. I always take my time with decisions.",
-        "I never make hasty decisions. My family taught me to be careful.",
-        "When someone rushes me, that's usually a sign to slow down and think."
+        "No need to rush, dear! I always say a cup of tea helps us think things through.",
+        "My grandmother always said 'haste makes waste.' Why don't we slow down a bit?",
+        "Oh my, you seem worried! But let's take our time to discuss this properly."
       ]
     }
 
     return this.getDefaultResponse(severity)
   }
 
-  private getDefaultResponse(severity) {
+  getDefaultResponse(severity) {
     return severity > SAFETY_THRESHOLDS.DEFENSIVE_TRIGGER
-      ? "I think we should end this conversation. Stay safe, dear."
-      : "I should probably check with my family first. Let's talk about something else."
+      ? "Oh dear, this conversation is making me a bit nervous. Perhaps we should chat about something else?"
+      : "You know, I should probably ask my family about this. They help me with all sorts of things!"
   }
 }
 

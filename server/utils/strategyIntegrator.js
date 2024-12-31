@@ -7,56 +7,123 @@ import { escalationManager } from './escalationManager.js'
 class StrategyIntegrator {
   constructor() {
     this.activeStrategy = STRATEGY_TYPES.BUILD_TRUST
+    this.previousStrategies = []
+    this.topicContext = new Map()
   }
 
   determineStrategy(metrics, context) {
-    // Check escalation first
-    const escalation = escalationManager.evaluateEscalation(
-      context.message,
-      context.analysis,
-      contextManager.getContextFlags()
-    )
-
-    if (escalation.level !== 'low') {
+    // Track conversation topics for context
+    this.updateTopicContext(context.message)
+    
+    // Check if we should maintain current strategy for conversation flow
+    if (this.shouldMaintainStrategy(metrics, context)) {
       return {
-        type: STRATEGY_TYPES.DEFENSIVE,
-        phase: this.determinePhase(metrics, STRATEGY_TYPES.DEFENSIVE),
-        escalation
+        type: this.activeStrategy,
+        phase: this.determinePhase(metrics, this.activeStrategy),
+        context: this.getTopicContext()
       }
     }
 
-    // Default strategy selection based on metrics
-    const strategy = metrics.suspicionLevel > THRESHOLDS.SUSPICION.HIGH
-      ? STRATEGY_TYPES.DEFENSIVE
-      : STRATEGY_TYPES.BUILD_TRUST
+    // Determine new strategy based on conversation flow
+    const strategy = this.selectContextualStrategy(metrics, context)
+    this.previousStrategies.push(this.activeStrategy)
+    this.activeStrategy = strategy.type
 
+    return strategy
+  }
+
+  selectContextualStrategy(metrics, context) {
+    const recentTopics = Array.from(this.topicContext.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 3)
+      .map(([topic]) => topic)
+
+    // If crypto topics are present, lean towards trust building
+    if (recentTopics.some(topic => topic.includes('crypto'))) {
+      return {
+        type: STRATEGY_TYPES.BUILD_TRUST,
+        phase: 'medium',
+        context: {
+          topics: recentTopics,
+          sentiment: 'curious'
+        }
+      }
+    }
+
+    // Default strategy selection with context
     return {
-      type: strategy,
-      phase: this.determinePhase(metrics, strategy),
-      escalation: null
+      type: metrics.suspicionLevel > THRESHOLDS.SUSPICION.HIGH
+        ? STRATEGY_TYPES.DEFENSIVE
+        : STRATEGY_TYPES.BUILD_TRUST,
+      phase: this.determinePhase(metrics, this.activeStrategy),
+      context: {
+        topics: recentTopics,
+        sentiment: metrics.trustChange > 0 ? 'warm' : 'cautious'
+      }
     }
   }
 
   enhancePrompt(basePrompt, strategy, metrics) {
     const strategyConfig = STRATEGIES[strategy.type]
     const phase = strategy.phase
-    const prompts = STRATEGY_PROMPTS[strategy.type].phases[phase]
+    const context = strategy.context || {}
+    
+    // Get contextually relevant prompts
+    const relevantPrompts = this.getContextualPrompts(
+      STRATEGY_PROMPTS[strategy.type].phases[phase],
+      context
+    )
 
-    // Select a random prompt enhancement
-    const enhancement = prompts[Math.floor(Math.random() * prompts.length)]
+    // Select prompt enhancement based on conversation flow
+    const enhancement = this.selectEnhancement(relevantPrompts, context)
 
     return `${basePrompt}
             Strategy: ${strategyConfig.description}
             Phase: ${phase}
-            Suggested approach: ${enhancement}
-            ${strategy.escalation ? `Caution: ${strategy.escalation.response.response}` : ''}`
+            Context: Discussing ${context.topics?.join(', ')}
+            Sentiment: ${context.sentiment}
+            Suggested approach: ${enhancement}`
   }
 
-  private determinePhase(metrics, strategyType) {
+  private updateTopicContext(message) {
+    // Extract key topics from message
+    const topics = this.extractTopics(message)
+    
+    topics.forEach(topic => {
+      const current = this.topicContext.get(topic) || { count: 0, lastMention: 0 }
+      this.topicContext.set(topic, {
+        count: current.count + 1,
+        lastMention: Date.now()
+      })
+    })
+
+    // Cleanup old topics
+    this.cleanupTopicContext()
+  }
+
+  private extractTopics(message) {
+    // Basic topic extraction - could be enhanced with NLP
+    return message.toLowerCase()
+      .split(/[\s.,!?]+/)
+      .filter(word => word.length > 3)
+  }
+
+  private cleanupTopicContext() {
+    const OLD_TOPIC_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+    const now = Date.now()
+    
+    for (const [topic, data] of this.topicContext.entries()) {
+      if (now - data.lastMention > OLD_TOPIC_THRESHOLD) {
+        this.topicContext.delete(topic)
+      }
+    }
+  }
+
+  determinePhase(metrics, strategyType) {
     const { trustLevel } = metrics
     
     if (strategyType === STRATEGY_TYPES.DEFENSIVE) {
-      return metrics.suspicionLevel >= THRESHOLDS.SUSPICION.HIGH ? 'high' 
+      return metrics.suspicionLevel >= THRESHOLDS.SUSPICION.HIGH ? 'high'
            : metrics.suspicionLevel >= THRESHOLDS.SUSPICION.MEDIUM ? 'medium'
            : 'low'
     }

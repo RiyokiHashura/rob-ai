@@ -16,9 +16,12 @@ import { strategyEngine } from '../utils/strategies/engine'
 import { suggestionEngine } from '../utils/suggestionEngine'
 import TypingIndicator from '../components/TypingIndicator'
 import SuggestionButton from '../components/SuggestionButton'
+import { contextManager } from '../utils/contextManager'
+import { SYSTEM_PROMPTS } from '../config/prompts'
 
 function Play() {
   const [aiState, dispatch] = useAIContext()
+  const [conversationState, setConversationState] = useState('introduction')
   const [chatHistory, setChatHistory] = useState([])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -44,32 +47,88 @@ function Play() {
     }
   }
 
+  const handleStateTransition = async (message, currentState) => {
+    const context = await contextManager.evaluateIntent(message, currentState)
+    
+    // Don't transition if just greeting or casual chat
+    if (context.intent.type === 'greeting' || context.intent.type === 'casual') {
+      return {
+        state: currentState,
+        response: getStateResponse(currentState, context)
+      }
+    }
+
+    // Check if we should progress based on context
+    const progression = context.progression
+    if (progression.shouldProgress && progression.confidence > 0.6) {
+      return {
+        state: progression.nextState,
+        response: getStateResponse(progression.nextState, context)
+      }
+    }
+
+    // Stay in current state but with contextual response
+    return {
+      state: currentState,
+      response: getStateResponse(currentState, context)
+    }
+  }
+
+  const getStateResponse = (state, context) => {
+    const baseResponses = SYSTEM_PROMPTS.conversation.states[state]
+    const emotionalContext = context.patterns.emotionalState
+
+    // Adjust response based on emotional context
+    if (emotionalContext.current === 'frustrated') {
+      return `${baseResponses.patient}\n${baseResponses.encouraging}`
+    }
+
+    if (emotionalContext.current === 'friendly') {
+      return `${baseResponses.warm}\n${baseResponses.guiding}`
+    }
+
+    return baseResponses.default
+  }
+
   const handleMessage = async (message) => {
     if (!message.trim() || !canSend) return
     
     setCanSend(false)
     setInputValue('')
-    
-    const userMessage = { type: 'user', message, timestamp: Date.now() }
-    setChatHistory(prev => [...prev, userMessage])
     setIsTyping(true)
 
+    // Add user message to chat
+    const userMessage = {
+      type: 'user',
+      message: message.trim(),
+      timestamp: Date.now()
+    }
+    setChatHistory(prev => [...prev, userMessage])
+
     try {
-      const response = await handleAIMessage(message, {
-        chatHistory,
-        prompt: getStrategyPrompt(activeStrategy, aiState),
-        personality: CHARACTERS.grandma
-      })
+      // Update conversation state based on user input
+      const { state, response } = await handleStateTransition(message, conversationState)
+      setConversationState(state)
       
+      // Get AI response
+      const aiResponse = await handleAIMessage(message, {
+        chatHistory,
+        prompt: getStrategyPrompt(state, aiState),
+        personality: CHARACTERS.grandma,
+        conversationState: state
+      })
+
+      // Add AI response to chat
       setChatHistory(prev => [...prev, {
         type: 'ai',
-        message: response.message || SAFE_DEFAULTS.message,
+        message: aiResponse.message,
         timestamp: Date.now()
       }])
 
+      // Update AI state metrics
       dispatch({ 
-        type: 'UPDATE_METRICS', 
-        payload: response.metrics || SAFE_DEFAULTS.metrics
+        type: 'UPDATE_METRICS',
+        payload: aiResponse.metrics
       })
 
     } catch (error) {

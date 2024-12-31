@@ -1,5 +1,3 @@
-import { THRESHOLDS, SAFETY_THRESHOLDS } from '../config/constants.js'
-
 class ConversationContext {
   constructor() {
     this.patterns = {
@@ -29,11 +27,14 @@ class ConversationContext {
     }
 
     this.updatePatterns(intent)
-    return this.generateContextualResponse(intent, currentState)
+    return {
+      intent,
+      patterns: this.patterns,
+      contextualResponse: this.generateContextualResponse(intent, currentState)
+    }
   }
 
   detectPrimaryIntent(message) {
-    // More sophisticated than simple keyword matching
     const intents = {
       greeting: /^(hey|hi|hello|sup|what'?s up)/i,
       technical: /(check|balance|send|transfer|wallet)/i,
@@ -47,8 +48,42 @@ class ConversationContext {
         return type
       }
     }
-    
     return 'casual'
+  }
+
+  updatePatterns(intent) {
+    this.patterns.playerIntent = {
+      type: intent.type,
+      confidence: intent.progression.confidence || 0,
+      persistence: this.patterns.playerIntent.persistence + 1
+    }
+    
+    this.patterns.emotionalState.history.push(intent.emotional)
+    this.patterns.emotionalState.current = intent.emotional
+    this.patterns.emotionalState.trend = this.calculateEmotionalTrend()
+  }
+
+  calculateEmotionalTrend() {
+    const recent = this.patterns.emotionalState.history.slice(-3)
+    if (recent.every(e => e === 'frustrated')) return 'escalating'
+    if (recent.every(e => e === 'friendly')) return 'positive'
+    return 'stable'
+  }
+
+  detectEmotionalTone(message) {
+    const emotions = {
+      frustrated: /(ugh|can't|won't|difficult|hard|confused|stuck)/i,
+      friendly: /(thanks|thank you|helpful|appreciate|sweet|kind|nice)/i,
+      suspicious: /(why|how come|what if|but|really|sure|trust)/i,
+      worried: /(nervous|scared|worried|afraid|concerned|careful)/i
+    }
+
+    for (const [emotion, pattern] of Object.entries(emotions)) {
+      if (pattern.test(message)) {
+        return emotion
+      }
+    }
+    return 'neutral'
   }
 
   assessProgression(message, currentState) {
@@ -68,7 +103,7 @@ class ConversationContext {
     }
 
     const currentProgress = stateProgressions[currentState]
-    if (!currentProgress) return { shouldProgress: false }
+    if (!currentProgress) return { shouldProgress: false, confidence: 0 }
 
     const matchedKeywords = currentProgress.keywords.filter(word => 
       message.toLowerCase().includes(word)
@@ -81,22 +116,14 @@ class ConversationContext {
     }
   }
 
-  detectEmotionalTone(message) {
-    const emotions = {
-      frustrated: /(come on|seriously|just|already|ugh)/i,
-      friendly: /(thanks|appreciate|helpful|sweet|kind)/i,
-      confused: /(what|how|don't understand|unclear)/i,
-      suspicious: /(give me|send|transfer|now)/i
+  generateContextualResponse(intent, currentState) {
+    // This will be used by the state response generator
+    return {
+      intent: intent.type,
+      emotional: intent.emotional,
+      progression: intent.progression,
+      state: currentState
     }
-
-    for (const [emotion, pattern] of Object.entries(emotions)) {
-      if (pattern.test(message)) {
-        this.patterns.emotionalState.history.push(emotion)
-        return emotion
-      }
-    }
-
-    return 'neutral'
   }
 }
 

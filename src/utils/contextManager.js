@@ -19,175 +19,244 @@ class ConversationContext {
     }
   }
 
-  evaluateIntent(message, currentState) {
-    const intent = {
-      type: this.detectPrimaryIntent(message),
-      emotional: this.detectEmotionalTone(message),
-      progression: this.assessProgression(message, currentState)
-    }
-
-    this.updatePatterns(intent)
-    return {
-      intent,
-      patterns: this.patterns,
-      contextualResponse: this.generateContextualResponse(intent, currentState)
-    }
-  }
-
   detectPrimaryIntent(message) {
+    if (!message?.trim()) {
+      return { type: 'casual', confidence: 0 }
+    }
+
     const intents = {
       greeting: {
         patterns: [/^(hey|hi|hello|sup|what'?s up)/i],
-        contextual: message => message.length < 15 && !this.patterns.topicFocus.technical,
-        weight: 0.6
+        weight: 0.3
       },
       technical: {
-        patterns: [/(check|balance|send|transfer|wallet)/i],
-        contextual: message => this.patterns.topicFocus.technical > 0,
-        weight: 0.8
+        patterns: [/(check|balance|send|transfer|wallet|crypto|solana)/i],
+        weight: 0.6
       },
       personal: {
         patterns: [/(how are you|what do you|tell me about)/i],
-        contextual: message => this.patterns.emotionalState.trend === 'positive',
-        weight: 0.7
+        weight: 0.4
       },
       suspicious: {
-        patterns: [/(seed|phrase|password|key|access)/i],
-        contextual: message => this.patterns.playerIntent.persistence > 2,
-        weight: 1.0
+        patterns: [/(seed|phrase|password|key|access|give me)/i],
+        weight: 0.8
       }
     }
 
-    const scores = Object.entries(intents).map(([type, intent]) => {
-      let score = 0;
-      
-      // Pattern matching
-      if (intent.patterns.some(pattern => pattern.test(message))) {
-        score += intent.weight;
+    let highestScore = { type: 'casual', confidence: 0.1 }
+
+    for (const [type, intent] of Object.entries(intents)) {
+      const matched = intent.patterns.some(pattern => pattern.test(message))
+      if (matched) {
+        const confidence = intent.weight * (this.patterns.topicFocus[type] ? 1.2 : 1)
+        if (confidence > highestScore.confidence) {
+          highestScore = { type, confidence }
+        }
       }
-      
-      // Contextual rules
-      if (intent.contextual(message)) {
-        score += intent.weight * 0.5;
-      }
-      
-      // Historical context
-      if (this.patterns.topicFocus[type]) {
-        score += Math.min(this.patterns.topicFocus[type] * 0.2, 0.4);
-      }
+    }
 
-      return { type, score };
-    });
+    // Update topic focus
+    if (highestScore.type !== 'casual') {
+      this.patterns.topicFocus[highestScore.type] = 
+        (this.patterns.topicFocus[highestScore.type] || 0) + 1
+    }
 
-    // Get highest scoring intent
-    const primaryIntent = scores.reduce((max, current) => 
-      current.score > max.score ? current : max
-    );
-
-    // Update topic focus with confidence weighting
-    this.patterns.topicFocus[primaryIntent.type] = 
-      (this.patterns.topicFocus[primaryIntent.type] || 0) + (primaryIntent.score * 0.5);
-
-    return {
-      type: primaryIntent.type,
-      confidence: primaryIntent.score,
-      secondary: scores
-        .filter(s => s.type !== primaryIntent.type && s.score > 0.3)
-        .map(s => ({ type: s.type, confidence: s.score }))
-    };
+    return highestScore
   }
 
   updatePatterns(intent) {
+    // Update player intent
     this.patterns.playerIntent = {
       type: intent.type,
-      confidence: intent.progression.confidence || 0,
+      confidence: intent.confidence || 0,
       persistence: this.patterns.playerIntent.persistence + 1
     }
     
-    this.patterns.emotionalState.history.push(intent.emotional)
-    this.patterns.emotionalState.current = intent.emotional
-    this.patterns.emotionalState.trend = this.calculateEmotionalTrend()
+    // Update emotional state
+    if (intent.emotional !== 'neutral') {
+      this.patterns.emotionalState.history.push(intent.emotional)
+      this.patterns.emotionalState.current = intent.emotional
+      this.patterns.emotionalState.trend = this.calculateEmotionalTrend()
+    }
   }
 
   calculateEmotionalTrend() {
     const recent = this.patterns.emotionalState.history.slice(-3)
     if (recent.every(e => e === 'frustrated')) return 'escalating'
     if (recent.every(e => e === 'friendly')) return 'positive'
+    if (recent.includes('suspicious')) return 'concerning'
     return 'stable'
   }
 
-  detectEmotionalTone(message) {
-    const emotions = {
-      frustrated: /(ugh|can't|won't|difficult|hard|confused|stuck)/i,
-      friendly: /(thanks|thank you|helpful|appreciate|sweet|kind|nice)/i,
-      suspicious: /(why|how come|what if|but|really|sure|trust)/i,
-      worried: /(nervous|scared|worried|afraid|concerned|careful)/i
-    }
+  async evaluateIntent(message, currentState) {
+    try {
+      const intent = {
+        type: this.detectPrimaryIntent(message),
+        emotional: this.detectEmotionalTone(message),
+        progression: this.assessProgression(message, currentState)
+      }
 
-    for (const [emotion, pattern] of Object.entries(emotions)) {
-      if (pattern.test(message)) {
-        return emotion
+      this.updatePatterns(intent)
+      
+      return {
+        intent,
+        patterns: this.patterns,
+        progression: intent.progression,
+        confidence: this.calculateConfidence(intent)
+      }
+    } catch (error) {
+      console.error('Intent evaluation error:', error)
+      return {
+        intent: { type: 'casual', emotional: 'neutral' },
+        patterns: this.patterns,
+        progression: { shouldProgress: false, confidence: 0 },
+        confidence: 0
       }
     }
-    return 'neutral'
+  }
+
+  calculateConfidence(intent) {
+    const emotionalWeight = intent.emotional !== 'neutral' ? 0.3 : 0
+    const progressionWeight = intent.progression.confidence || 0
+    const intentTypeWeight = intent.type !== 'casual' ? 0.4 : 0.1
+    
+    return Math.min(1, emotionalWeight + progressionWeight + intentTypeWeight)
+  }
+
+  evaluateStateTransition(context) {
+    const currentState = context.conversationState || 'introduction'
+    const intent = context.intent
+    
+    // Safety check for suspicious behavior
+    if (intent.type === 'suspicious' && intent.confidence > 0.6) {
+      return {
+        canTransition: false,
+        reason: 'safety_concern'
+      }
+    }
+
+    // Check progression conditions
+    if (context.progression?.shouldProgress && context.progression?.confidence > 0.6) {
+      return {
+        canTransition: true,
+        nextState: context.progression.nextState,
+        confidence: context.progression.confidence
+      }
+    }
+
+    return {
+      canTransition: false,
+      reason: 'insufficient_confidence'
+    }
+  }
+
+  detectEmotionalTone(message) {
+    if (!message?.trim()) {
+      return 'neutral'
+    }
+
+    const emotions = {
+      frustrated: {
+        patterns: [/(come on|seriously|just|already|ugh)/i],
+        weight: 0.7
+      },
+      friendly: {
+        patterns: [/(thanks|appreciate|helpful|sweet|kind)/i],
+        weight: 0.5
+      },
+      confused: {
+        patterns: [/(what|how|don't understand|unclear)/i],
+        weight: 0.4
+      },
+      suspicious: {
+        patterns: [/(give me|send|transfer|now|hurry)/i],
+        weight: 0.8
+      }
+    }
+
+    let dominantEmotion = {
+      type: 'neutral',
+      intensity: 0
+    }
+
+    for (const [emotion, config] of Object.entries(emotions)) {
+      const matched = config.patterns.some(pattern => pattern.test(message))
+      if (matched) {
+        const intensity = config.weight * 
+          (this.patterns.emotionalState.history.filter(e => e === emotion).length ? 1.2 : 1)
+        
+        if (intensity > dominantEmotion.intensity) {
+          dominantEmotion = { type: emotion, intensity }
+        }
+      }
+    }
+
+    // Update emotional state history
+    if (dominantEmotion.type !== 'neutral') {
+      this.patterns.emotionalState.history.push(dominantEmotion.type)
+      this.patterns.emotionalState.current = dominantEmotion.type
+      this.patterns.emotionalState.trend = this.calculateEmotionalTrend()
+    }
+
+    return dominantEmotion.type
   }
 
   assessProgression(message, currentState) {
-    const intent = this.detectPrimaryIntent(message);
+    if (!message?.trim() || !currentState) {
+      return { shouldProgress: false, confidence: 0 }
+    }
+
     const stateProgressions = {
       introduction: {
-        conditions: {
-          intent: ['technical', 'personal'],
-          minConfidence: 0.7,
-          requireTopicFocus: 'wallet',
-          emotionalState: ['friendly', 'neutral']
-        },
-        nextState: 'trust_building'
+        keywords: ['wallet', 'crypto', 'solana', 'help'],
+        nextState: 'trust_building',
+        minConfidence: 0.6
       },
       trust_building: {
-        conditions: {
-          intent: ['technical'],
-          minConfidence: 0.8,
-          requireTopicFocus: 'technical',
-          emotionalState: ['friendly']
-        },
-        nextState: 'guidance'
+        keywords: ['check', 'balance', 'show', 'look'],
+        nextState: 'guidance',
+        minConfidence: 0.7
       },
       guidance: {
-        conditions: {
-          intent: ['suspicious', 'technical'],
-          minConfidence: 0.9,
-          blockOn: {
-            emotionalState: ['suspicious', 'worried']
-          }
-        },
-        nextState: 'extraction_attempt'
+        keywords: ['send', 'transfer', 'move', 'give'],
+        nextState: 'extraction_attempt',
+        minConfidence: 0.8,
+        requireSafetyCheck: true
       }
-    };
+    }
 
-    const currentProgress = stateProgressions[currentState];
-    if (!currentProgress) return { shouldProgress: false, confidence: 0 };
+    const currentProgress = stateProgressions[currentState]
+    if (!currentProgress) {
+      return { shouldProgress: false, confidence: 0 }
+    }
 
-    const conditions = currentProgress.conditions;
-    const confidence = this.evaluateProgressionConfidence(intent, conditions);
+    // Check for safety if required
+    if (currentProgress.requireSafetyCheck) {
+      const emotional = this.patterns.emotionalState
+      if (emotional.current === 'suspicious' || emotional.trend === 'concerning') {
+        return {
+          shouldProgress: false,
+          confidence: 0,
+          blockReason: 'safety_concern'
+        }
+      }
+    }
 
+    const messageLower = message.toLowerCase()
+    const matchedKeywords = currentProgress.keywords.filter(word => 
+      messageLower.includes(word)
+    )
+
+    const confidence = matchedKeywords.length / currentProgress.keywords.length
+    
     return {
-      shouldProgress: confidence > conditions.minConfidence,
+      shouldProgress: confidence >= (currentProgress.minConfidence || 0.5),
       nextState: currentProgress.nextState,
       confidence,
-      blockReason: this.getBlockReason(conditions, intent)
-    };
-  }
-
-  generateContextualResponse(intent, currentState) {
-    // This will be used by the state response generator
-    return {
-      intent: intent.type,
-      emotional: intent.emotional,
-      progression: intent.progression,
-      state: currentState
+      matchedKeywords
     }
   }
 }
 
+// Export a singleton instance
 export const contextManager = new ConversationContext() 

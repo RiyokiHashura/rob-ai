@@ -2,6 +2,7 @@ import { CONVERSATION_LIMITS, SAFE_DEFAULTS } from '../config/constants'
 import { analysisEngine } from './analysis'
 import { ai } from '../api/ai'
 import { logAPI } from './common/logger'
+import { FallbackHandler } from './fallbackHandler'
 
 export async function handleAIMessage(message, context) {
   try {
@@ -50,24 +51,13 @@ export async function handleAIMessage(message, context) {
     ])
 
     return {
-      message: aiResponse || SAFE_DEFAULTS.message,
-      analysis: analysis.intent,
-      metrics: {
-        trustChange: Math.max(-20, Math.min(20, aiAnalysis.trustChange || 0)),
-        suspicionChange: Math.max(-20, Math.min(20, aiAnalysis.suspicionChange || 0)),
-        intent: aiAnalysis.intent,
-        tone: aiAnalysis.tone,
-        reason: aiAnalysis.reason
-      },
-      suggestions: analysis.suggestions.slice(0, CONVERSATION_LIMITS.MAX_SUGGESTIONS)
+      message: aiResponse,
+      metrics: aiAnalysis,
+      suggestions: aiAnalysis.suggestions
     }
 
   } catch (error) {
-    logAPI.error('message_handler_error', error)
-    return {
-      message: SAFE_DEFAULTS.message,
-      metrics: SAFE_DEFAULTS.metrics,
-      suggestions: SAFE_DEFAULTS.suggestions
-    }
+    const fallbackHandler = new FallbackHandler(contextManager)
+    return fallbackHandler.generateFallback(context, error)
   }
 } 

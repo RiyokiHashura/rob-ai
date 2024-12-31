@@ -49,28 +49,18 @@ function Play() {
 
   const handleStateTransition = async (message, currentState) => {
     const context = await contextManager.evaluateIntent(message, currentState)
+    const stateEvaluation = contextManager.evaluateStateTransition(context)
     
-    // Don't transition if just greeting or casual chat
-    if (context.intent.type === 'greeting' || context.intent.type === 'casual') {
+    if (!stateEvaluation.canTransition) {
       return {
         state: currentState,
-        response: getStateResponse(currentState, context)
+        response: getStateResponse(currentState, context, stateEvaluation.reason)
       }
     }
 
-    // Check if we should progress based on context
-    const progression = context.progression
-    if (progression.shouldProgress && progression.confidence > 0.6) {
-      return {
-        state: progression.nextState,
-        response: getStateResponse(progression.nextState, context)
-      }
-    }
-
-    // Stay in current state but with contextual response
     return {
-      state: currentState,
-      response: getStateResponse(currentState, context)
+      state: stateEvaluation.nextState,
+      response: getStateResponse(stateEvaluation.nextState, context)
     }
   }
 

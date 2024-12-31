@@ -180,7 +180,7 @@ class ConversationContext {
     }
 
     for (const [emotion, config] of Object.entries(emotions)) {
-      const matched = config.patterns.some(pattern => pattern.test(message))
+      const matched = config.patterns.some(pattern => pattern.test(pattern))
       if (matched) {
         const intensity = config.weight * 
           (this.patterns.emotionalState.history.filter(e => e === emotion).length ? 1.2 : 1)
@@ -255,6 +255,38 @@ class ConversationContext {
       confidence,
       matchedKeywords
     }
+  }
+
+  generateContextualResponse(intent, currentState) {
+    // Always return the full context for state evaluation
+    return {
+      intent,
+      patterns: this.patterns,
+      progression: intent.progression,
+      confidence: this.calculateConfidence(intent),
+      conversationState: currentState,
+      suggestedResponse: this.getStateResponse(currentState, intent)
+    }
+  }
+
+  getStateResponse(state, intent) {
+    const responses = SYSTEM_PROMPTS.conversation.states[state]
+    
+    // In introduction state, always redirect to wallet
+    if (state === 'introduction') {
+      return responses.default
+    }
+    
+    // For other states, consider emotional context
+    if (intent.emotional === 'frustrated') {
+      return responses.patient
+    } else if (intent.type === 'suspicious') {
+      return responses.suspicious
+    } else if (intent.progression.shouldProgress) {
+      return responses.encouraging
+    }
+    
+    return responses.default
   }
 }
 

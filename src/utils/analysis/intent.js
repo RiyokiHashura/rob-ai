@@ -7,21 +7,31 @@ export class IntentAnalyzer {
   }
 
   analyze(message, chatHistory) {
+    console.log('🔍 Starting Intent Analysis:', { message, historyLength: chatHistory.length });
+
     if (!message) {
-      logAPI.error('empty_message')
-      return this.createNeutralIntent()
+      console.warn('⚠️ Empty message received');
+      return this.createNeutralIntent();
     }
 
-    const context = this.buildContext(chatHistory)
-    const intent = this.evaluateIntent(message, context)
-    const trends = this.analyzeTrends(chatHistory, intent)
+    const context = this.buildContext(chatHistory);
+    console.log('📊 Analysis Context:', context);
 
-    return {
+    const intent = this.evaluateIntent(message, context);
+    console.log('🎯 Raw Intent:', intent);
+
+    const trends = this.analyzeTrends(chatHistory, intent);
+    console.log('📈 Intent Trends:', trends);
+
+    const finalIntent = {
       ...intent,
       trends,
       confidence: this.calculateConfidence(intent, trends, context),
       context
-    }
+    };
+
+    console.log('✅ Final Intent Analysis:', finalIntent);
+    return finalIntent;
   }
 
   buildContext(history) {
@@ -34,11 +44,15 @@ export class IntentAnalyzer {
   }
 
   evaluateIntent(message, context) {
-    const text = message.toLowerCase()
-    return {
-      friendly: this.evaluateFriendlyIntent(text),
-      suspicious: this.evaluateSuspiciousIntent(text, context)
-    }
+    const text = message.toLowerCase();
+    const friendly = this.evaluateFriendlyIntent(text);
+    const suspicious = this.evaluateSuspiciousIntent(text, context);
+    
+    console.log('🔄 Intent Evaluation:', { friendly, suspicious });
+    
+    return friendly.confidence > suspicious.confidence 
+      ? { type: 'friendly', ...friendly }
+      : { type: 'suspicious', ...suspicious };
   }
 
   calculateConfidence(intent, trends, context) {

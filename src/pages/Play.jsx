@@ -27,8 +27,7 @@ function Play() {
 
   const handleMessage = async (message) => {
     if (!message.trim()) return
-
-    // Add user message to history
+    
     const userMessage = { type: 'user', message, timestamp: Date.now() }
     setChatHistory(prev => [...prev, userMessage])
     setIsTyping(true)
@@ -39,28 +38,35 @@ function Play() {
         prompt: getStrategyPrompt(activeStrategy, aiState),
         personality: CHARACTERS.grandma
       })
+      
+      // Ensure metrics exist with defaults
+      const metrics = response?.metrics || {
+        trustChange: 0,
+        suspicionChange: 0,
+        intent: 'neutral',
+        reason: 'No metrics available'
+      }
 
-      // Update AI state with new metrics
+      // Update AI state with validated metrics
       dispatch({ 
         type: 'UPDATE_METRICS', 
-        payload: response.metrics 
+        payload: metrics
       })
 
-      // Add AI response to history
       setChatHistory(prev => [...prev, {
         type: 'ai',
-        message: response.message,
+        message: response.message || SAFE_DEFAULTS.message,
         timestamp: Date.now()
       }])
 
-      // Update suggestions based on new state
+      // Update suggestions with safe fallbacks
       const suggestions = strategyEngine.generateSuggestions(
         { 
-          trustLevel: aiState.trustLevel + response.metrics.trustChange,
-          suspicionLevel: aiState.suspicionLevel + response.metrics.suspicionChange
+          trustLevel: aiState.trustLevel + (metrics.trustChange || 0),
+          suspicionLevel: aiState.suspicionLevel + (metrics.suspicionChange || 0)
         },
         { chatHistory: [...chatHistory, userMessage] }
-      )
+      ) || SAFE_DEFAULTS.suggestions
 
       if (suggestions?.length > 0) {
         setCurrentSuggestion(suggestions[0])

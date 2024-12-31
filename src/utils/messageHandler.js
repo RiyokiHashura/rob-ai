@@ -5,6 +5,8 @@ import { logAPI } from './common/logger'
 
 export async function handleAIMessage(message, context) {
   try {
+    console.log('2. handleAIMessage called with:', { message, context })
+    
     // Validate input
     if (!message?.trim() || message.length > CONVERSATION_LIMITS.MAX_MESSAGE_LENGTH) {
       throw new Error('Invalid message')
@@ -12,12 +14,34 @@ export async function handleAIMessage(message, context) {
 
     // Run local analysis
     const analysis = analysisEngine.analyze(message, context)
+    console.log('2a. Local analysis:', analysis)
     
     // Get AI response and analysis
     const [aiResponse, aiAnalysis] = await Promise.all([
-      ai.generateResponse(context.prompt, message, context.chatHistory),
+      ai.generateResponse({
+        ...context.prompt,
+        type: analysis.confidence < 0.15 ? 'neutral' :
+              analysis.intent === 'suspicious' && analysis.confidence > 0.6 ? 'suspicious' :
+              'friendly',
+        confidence: analysis.confidence
+      }, message, context.chatHistory),
       ai.analyzeMessage(message, context.chatHistory, context.personality)
     ])
+    
+    console.log('3. AI Response Generation:', {
+      intent: analysis.intent,
+      confidence: analysis.confidence,
+      mappedType: analysis.confidence < 0.15 ? 'neutral' :
+                  analysis.intent === 'suspicious' && analysis.confidence > 0.6 ? 'suspicious' :
+                  'friendly'
+    });
+
+    console.log('3. AI responses:', { 
+      response: aiResponse, 
+      analysis: aiAnalysis,
+      intent: analysis.intent,
+      confidence: analysis.confidence
+    })
 
     // Combine analyses with safety limits
     const combinedMetrics = {

@@ -1,86 +1,66 @@
+import { ANALYSIS, THRESHOLDS } from '../config/constants'
+
 class IntentEvaluator {
-  constructor() {
-    this.patterns = {
-      suspicious: {
-        urgency: [
-          'urgent', 'quickly', 'hurry', 'now', 'immediate',
-          'emergency', 'critical', 'asap', 'deadline'
-        ],
-        pressure: [
-          'must', 'need to', 'have to', 'should', 'important',
-          'required', 'mandatory', 'essential'
-        ]
-      },
-      friendly: {
-        positive: [
-          'thank', 'appreciate', 'glad', 'happy', 'nice',
-          'wonderful', 'great', 'lovely', 'enjoy', 'care'
-        ],
-        personal: [
-          'family', 'friend', 'share', 'help', 'understand',
-          'listen', 'support', 'together', 'chat'
-        ]
-      }
-    }
-  }
-
-  evaluateIntent(text, context) {
-    const suspicious = this.evaluateSuspicious(text, context)
-    const friendly = this.evaluateFriendly(text)
-
-    return this.determineMainIntent({
-      suspicious,
-      friendly
-    }, context)
-  }
-
-  evaluateSuspicious(text, context) {
-    const hasUrgency = this.checkPatterns(text, this.patterns.suspicious.urgency)
-    const hasPressure = this.checkPatterns(text, this.patterns.suspicious.pressure)
-
-    return {
-      detected: hasUrgency || hasPressure,
-      confidence: this.calculateConfidence({
-        base: hasUrgency ? 0.6 : 0,
-        pressure: hasPressure ? 0.4 : 0
-      })
-    }
-  }
-
-  evaluateFriendly(text) {
-    const hasPositive = this.checkPatterns(text, this.patterns.friendly.positive)
-    const hasPersonal = this.checkPatterns(text, this.patterns.friendly.personal)
-
-    return {
-      detected: hasPositive || hasPersonal,
-      confidence: this.calculateConfidence({
-        base: hasPositive ? 0.5 : 0,
-        personal: hasPersonal ? 0.3 : 0
-      })
-    }
-  }
-
-  determineMainIntent(results, context) {
-    if (results.suspicious.detected && results.suspicious.confidence > 0.5) {
-      return { type: 'suspicious', confidence: results.suspicious.confidence }
-    }
+  evaluateIntent(message, context) {
+    console.log('🔍 Intent Evaluation Start:', { message });
     
-    if (results.friendly.detected) {
-      return { type: 'friendly', confidence: results.friendly.confidence }
+    const patterns = this.analyzePatterns(message);
+    console.log('📊 Pattern Analysis:', patterns);
+    
+    const intent = this.determineIntent(patterns, context);
+    console.log('✅ Final Intent:', intent);
+    
+    return intent;
+  }
+
+  analyzePatterns(message) {
+    const text = message.toLowerCase();
+    return {
+      greeting: /^(hi|hello|hey|good|greetings)/i.test(text),
+      positive: this.checkPatterns(text, ['thanks', 'please', 'nice', 'good']),
+      personal: this.checkPatterns(text, ['you', 'your', 'how', 'what']),
+      urgent: this.checkPatterns(text, ['urgent', 'emergency', 'now', 'quickly']),
+      pressure: this.checkPatterns(text, ['must', 'need', 'have to', 'should'])
+    };
+  }
+
+  determineIntent(patterns, context) {
+    // Base confidence scores with weighted patterns
+    let friendlyScore = (patterns.greeting ? 0.3 : 0) +
+                       (patterns.positive ? 0.2 : 0) +
+                       (patterns.personal ? 0.2 : 0);
+                       
+    let suspiciousScore = (patterns.urgent ? 0.4 : 0) +
+                         (patterns.pressure ? 0.3 : 0);
+    
+    // Apply confidence boosts based on context
+    if (context?.recentInteractions > 2) {
+      friendlyScore += 0.1;
     }
 
-    return { type: 'neutral', confidence: 0.5 }
+    console.log('🎯 Raw Intent Scores:', {
+      friendly: friendlyScore,
+      suspicious: suspiciousScore,
+      patterns
+    });
+
+    // Use constants from config
+    const minConfidence = ANALYSIS.BASE_CONFIDENCE;
+    const type = friendlyScore > suspiciousScore ? 'friendly' : 'suspicious';
+    const confidence = Math.min(ANALYSIS.MAX_CONFIDENCE, 
+                              Math.max(friendlyScore, suspiciousScore));
+
+    return {
+      type: confidence < minConfidence ? 'neutral' : type,
+      confidence,
+      patterns,
+      reason: `${type} intent detected with ${(confidence * 100).toFixed(1)}% confidence`
+    };
   }
 
-  checkPatterns(text, patterns) {
-    const words = text.toLowerCase().split(/\s+/)
-    return patterns.some(pattern => words.includes(pattern))
-  }
-
-  calculateConfidence(factors) {
-    const total = Object.values(factors).reduce((sum, val) => sum + val, 0)
-    return Math.min(1.0, Math.max(0, total))
+  checkPatterns(text, keywords) {
+    return keywords.some(word => text.includes(word));
   }
 }
 
-export const intentEvaluator = new IntentEvaluator() 
+export const intentEvaluator = new IntentEvaluator(); 

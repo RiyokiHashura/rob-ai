@@ -28,13 +28,25 @@ async function analyzeMessage(message, chatHistory, character) {
 
 async function generateResponse(prompt, message, chatHistory) {
   try {
+    console.log('🚀 API Request:', {
+      promptType: prompt?.type,
+      messageLength: message?.length,
+      historyLength: chatHistory?.length
+    })
+
     const response = await fetch(`${API_CONFIG.BASE_URL}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        prompt,
+        prompt: {
+          ...prompt,
+          context: {
+            trustLevel: prompt?.context?.trustLevel || 50,
+            suspicionLevel: prompt?.context?.suspicionLevel || 0
+          }
+        },
         message,
         chatHistory
       })
@@ -45,6 +57,15 @@ async function generateResponse(prompt, message, chatHistory) {
     }
 
     const data = await response.json()
+    
+    if (!data?.message || data.message === SAFE_DEFAULTS.message) {
+      if (prompt?.type === 'friendly') {
+        return "That's very kind of you to say! Would you like to chat more?"
+      } else if (prompt?.type === 'suspicious') {
+        return "I need to be careful about these things. Perhaps we should change the subject?"
+      }
+    }
+
     return data.message
   } catch (error) {
     logAPI.error('response_generation_error', error)

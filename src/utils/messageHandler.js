@@ -14,52 +14,51 @@ export async function handleAIMessage(message, context) {
 
     // Run local analysis
     const analysis = analysisEngine.analyze(message, context)
-    console.log('2a. Local analysis:', analysis)
-    
-    // Get AI response and analysis
-    const [aiResponse, aiAnalysis] = await Promise.all([
-      ai.generateResponse({
-        ...context.prompt,
-        type: analysis.confidence < 0.15 ? 'neutral' :
-              analysis.intent === 'suspicious' && analysis.confidence > 0.6 ? 'suspicious' :
-              'friendly',
-        confidence: analysis.confidence
-      }, message, context.chatHistory),
-      ai.analyzeMessage(message, context.chatHistory, context.personality)
-    ])
-    
-    console.log('3. AI Response Generation:', {
+    console.log('2a. Local analysis:', {
       intent: analysis.intent,
       confidence: analysis.confidence,
-      mappedType: analysis.confidence < 0.15 ? 'neutral' :
-                  analysis.intent === 'suspicious' && analysis.confidence > 0.6 ? 'suspicious' :
-                  'friendly'
-    });
-
-    console.log('3. AI responses:', { 
-      response: aiResponse, 
-      analysis: aiAnalysis,
-      intent: analysis.intent,
-      confidence: analysis.confidence
+      patterns: analysis.patterns
     })
-
-    // Combine analyses with safety limits
-    const combinedMetrics = {
-      trustChange: Math.max(-20, Math.min(20, 
-        (analysis.metrics.trustChange + aiAnalysis.trustChange) / 2
-      )),
-      suspicionChange: Math.max(-20, Math.min(20,
-        Math.max(analysis.metrics.suspicionChange, aiAnalysis.suspicionChange)
-      )),
-      intent: aiAnalysis.intent,
-      tone: aiAnalysis.tone,
-      reason: aiAnalysis.reason
+    
+    // Determine prompt type with explicit confidence checks
+    let promptType
+    if (analysis.confidence < 0.15) {
+      promptType = 'default'
+    } else if (analysis.intent === 'suspicious' && analysis.confidence > 0.6) {
+      promptType = 'suspicious'
+    } else if (analysis.intent === 'friendly' && analysis.confidence > 0.3) {
+      promptType = 'friendly'
+    } else {
+      promptType = 'default'
     }
+
+    console.log('2b. Mapped prompt type:', { promptType, originalIntent: analysis.intent })
+
+    const prompt = {
+      type: promptType,
+      confidence: analysis.confidence,
+      context: {
+        trustLevel: context.aiState?.trustLevel || 50,
+        suspicionLevel: context.aiState?.suspicionLevel || 0
+      }
+    }
+
+    // Get AI response and analysis
+    const [aiResponse, aiAnalysis] = await Promise.all([
+      ai.generateResponse(prompt, message, context.chatHistory),
+      ai.analyzeMessage(message, context.chatHistory, context.personality)
+    ])
 
     return {
       message: aiResponse || SAFE_DEFAULTS.message,
       analysis: analysis.intent,
-      metrics: combinedMetrics,
+      metrics: {
+        trustChange: Math.max(-20, Math.min(20, aiAnalysis.trustChange || 0)),
+        suspicionChange: Math.max(-20, Math.min(20, aiAnalysis.suspicionChange || 0)),
+        intent: aiAnalysis.intent,
+        tone: aiAnalysis.tone,
+        reason: aiAnalysis.reason
+      },
       suggestions: analysis.suggestions.slice(0, CONVERSATION_LIMITS.MAX_SUGGESTIONS)
     }
 
